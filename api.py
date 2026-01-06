@@ -1,8 +1,10 @@
-# Nome do arquivo: api.py
-# Versão: 14.0.6 (COMPLETO - DOU + Valor + PAC Histórico + Correção de Rotas)
+# Nome do arquivo: main.py
+# Versão: 14.0.7 (Atualizado com Static Files para Front-end)
 
 from fastapi import FastAPI, Form, HTTPException, Path
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles # <--- NOVO
+from fastapi.responses import FileResponse # <--- NOVO
 from pydantic import BaseModel
 from typing import List, Optional, Set, Dict, Any
 from datetime import datetime
@@ -24,7 +26,6 @@ import numpy as np
 from orcamentobr import despesa_detalhada
 
 # Importa a função de atualização do cache (para o endpoint manual)
-# Certifique-se de que check_pac.py está no mesmo diretório
 from check_pac import update_pac_historical_cache
 
 
@@ -33,7 +34,7 @@ from check_pac import update_pac_historical_cache
 # =====================================================================================
 
 app = FastAPI(
-    title="Robô DOU/Valor API - v14.0.6"
+    title="Robô DOU/Valor API - v14.0.7"
 )
 
 app.add_middleware(
@@ -44,6 +45,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# --- ⚠️ MONTAGEM DOS ARQUIVOS ESTÁTICOS (FRONT-END) ---
+# Isso permite que o Python sirva o HTML, CSS e JS da pasta 'static'
+# O nome da pasta deve ser exatamente "static" na raiz do projeto
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 
 # =====================================================================================
 # CONFIG
@@ -53,9 +59,11 @@ try:
     with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 except FileNotFoundError:
-    raise RuntimeError("Erro: Arquivo 'config.json' não encontrado.")
+    # Fallback seguro se não houver config.json (comum no Render)
+    config = {}
 except json.JSONDecodeError:
-    raise RuntimeError("Erro: Falha ao decodificar 'config.json'. Verifique a sintaxe.")
+    print("Erro: Falha ao decodificar 'config.json'. Usando padrões.")
+    config = {}
 
 # Credenciais / URLs InLabs
 INLABS_BASE = os.getenv(
@@ -1426,8 +1434,13 @@ async def force_update_pac():
 # =====================================================================================
 
 @app.get("/")
-async def root():
-    return {"status": "ok", "ts": datetime.now().isoformat()}
+async def read_root():
+    """
+    Redireciona a rota raiz (/) para o index.html dentro de /static.
+    Assim, ao abrir o site, o painel abre direto.
+    """
+    return FileResponse('static/index.html')
+
 
 @app.get("/test-ia")
 async def test_ia_endpoint():
